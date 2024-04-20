@@ -188,22 +188,28 @@ class ClimaX(nn.Module):
         imgs = x.reshape(shape=(x.shape[0], c, h * p, w * p))
         return imgs
 
-    def aggregate_variables(self, x: torch.Tensor):
+    def aggregate_variables(self, x: torch.Tensor, target: torch.Tensor):
         """
         x: B, V, L, D
         """
         b, _, l, _ = x.shape
         x = torch.einsum("bvld->blvd", x)
         x = x.flatten(0, 1)  # BxL, V, D
+        target = torch.einsum("bvld->bvld", target)
+        target = target.flatten(0, 1) # BxL, V, D
 
         var_query = self.var_query.repeat_interleave(x.shape[0], dim=0)
         x, _ = self.var_agg(var_query, x, x)  # BxL, D
         x = x.squeeze()
+        target, _ = self.var_agg(var_query, target, target)  # //MODIFIED: Use the same learnable query vector, since within an image it should learn the same variables
+        target = target.squeeze()
+        
+        x, _ = self.in_out_agg(target, x, x)
 
         x = x.unflatten(dim=0, sizes=(b, l))  # B, L, D
         return x
 
-    def forward_encoder(self, x: torch.Tensor, lead_times: torch.Tensor, variables):
+    def forward_encoder(self, x: torch.Tensor, target: torch.Tensor, lead_times: torch.Tensor, variables):
         # x: `[B, V, H, W]` shape.
 
         if isinstance(variables, list):
@@ -211,7 +217,9 @@ class ClimaX(nn.Module):
 
         # tokenize each variable separately
         embeds = []
+        targ_embeds = []  # //MODIFIED: Target embeds
         var_ids = self.get_var_ids(variables, x.device)
+        targ_var_ids = self.get_var_ids(variables, y.device)  # //MODIFIED: added line in case y_ids were different
 
         if self.parallel_patch_embed:
             x = self.token_embeds(x, var_ids)  # B, V, L, D
@@ -220,15 +228,23 @@ class ClimaX(nn.Module):
                 id = var_ids[i]
                 embeds.append(self.token_embeds[id](x[:, i : i + 1]))
             x = torch.stack(embeds, dim=1)  # B, V, L, D
+        # //MODIFIED: Duplicated above tokenization block to tokenize the target image
+        if self.parallel_patch_embed:
+            target = self.token_embeds(target, targ_var_ids)  # B, V, L, D
+        else:
+            for i in range(len(targ_var_ids)):
+                id = targ_var_ids[i]
+                targ_embeds.append(self.token_embeds[id](target[:, i : i + 1]))
+            target = torch.stack(targ_embeds, dim=1)  # B, V, L, D
 
         # add variable embedding
         var_embed = self.get_var_emb(self.var_embed, variables)
         x = x + var_embed.unsqueeze(2)  # B, V, L, D
 
-        # variable aggregation
-        x = self.aggregate_variables(x)  # B, L, D
+        # variable aggregation// MODIFIED: added target as input
+        x = self.aggregate_variables(x, y)  # B, L, D
 
-        # add pos embedding
+        # add pos embedding// NEEDS TO BE REMOVED
         x = x + self.pos_embed
 
         # add lead time embedding
@@ -257,13 +273,15 @@ class ClimaX(nn.Module):
             loss (list): Different metrics.
             preds (torch.Tensor): `[B, Vo, H, W]` shape. Predicted weather/climate variables.
         """
-        out_transformers = self.forward_encoder(x, lead_times, variables)  # B, L, D
+        out_transformers = self.forward_encoder(x, y, lead_times, variables)  # B, L, D
+        # //MODIFY: After modification preds will be a scalar value predicting the lead time
         preds = self.head(out_transformers)  # B, L, V*p*p
-
+        # //MODIFY: so no need for this unpatchify stuff
         preds = self.unpatchify(preds)
         out_var_ids = self.get_var_ids(tuple(out_variables), preds.device)
         preds = preds[:, out_var_ids]
-
+        
+        # //NEED TO MODIFY: m (a metric) needs to take in lead_times instead of y, and the correct lead time at that.
         if metric is None:
             loss = None
         else:
@@ -271,6 +289,7 @@ class ClimaX(nn.Module):
 
         return loss, preds
 
+    # //NEED TO MODIFY: m (a metric) needs to take in lead_times instead of y, and the correct lead time at that.
     def evaluate(self, x, y, lead_times, variables, out_variables, transform, metrics, lat, clim, log_postfix):
         _, preds = self.forward(x, y, lead_times, variables, out_variables, metric=None, lat=lat)
         return [m(preds, y, transform, out_variables, lat, clim, log_postfix) for m in metrics]
