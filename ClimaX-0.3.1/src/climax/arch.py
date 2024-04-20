@@ -70,8 +70,14 @@ class ClimaX(nn.Module):
         self.var_embed, self.var_map = self.create_var_embedding(embed_dim)
 
         # variable aggregation: a learnable query and a single-layer cross attention
+        # Takes in V x h x w sequence of embeddings and outputs a sequence of h x w length
         self.var_query = nn.Parameter(torch.zeros(1, 1, embed_dim), requires_grad=True)
         self.var_agg = nn.MultiheadAttention(embed_dim, num_heads, batch_first=True)
+        
+        # input-target aggregation: a learnable query and a single-layer cross attention
+        # Somewhat similarly to the cross-attention module, we map queries to the aggregated target images
+        # and compute affinities (weights) with the aggregated input image. No need for learnable queries then.
+        self.in_out_agg = nn.MultiheadAttention(embed_dim, num_heads, batch_first=True)
 
         # positional embedding and lead time embedding
         self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, embed_dim), requires_grad=True)
