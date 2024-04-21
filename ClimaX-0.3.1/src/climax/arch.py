@@ -195,8 +195,8 @@ class ClimaX(nn.Module):
         b, _, l, _ = x.shape
         x = torch.einsum("bvld->blvd", x)
         x = x.flatten(0, 1)  # BxL, V, D
-        target = torch.einsum("bvld->bvld", target)
-        target = target.flatten(0, 1) # BxL, V, D
+        target = torch.einsum("bvld->bvld", target)    #  //MODIFIED
+        target = target.flatten(0, 1) # BxL, V, D    #  //MODIFIED
 
         var_query = self.var_query.repeat_interleave(x.shape[0], dim=0)
         x, _ = self.var_agg(var_query, x, x)  # BxL, D
@@ -245,12 +245,12 @@ class ClimaX(nn.Module):
         x = self.aggregate_variables(x, y)  # B, L, D
 
         # add pos embedding// NEEDS TO BE REMOVED
-        x = x + self.pos_embed
+        # x = x + self.pos_embed
 
-        # add lead time embedding
-        lead_time_emb = self.lead_time_embed(lead_times.unsqueeze(-1))  # B, D
-        lead_time_emb = lead_time_emb.unsqueeze(1)
-        x = x + lead_time_emb  # B, L, D
+        # add lead time embedding// NEEDS TO BE REMOVED
+        # lead_time_emb = self.lead_time_embed(lead_times.unsqueeze(-1))  # B, D
+        # lead_time_emb = lead_time_emb.unsqueeze(1)
+        # x = x + lead_time_emb  # B, L, D
 
         x = self.pos_drop(x)
 
