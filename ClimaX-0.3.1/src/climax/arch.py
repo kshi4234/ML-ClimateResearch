@@ -106,13 +106,20 @@ class ClimaX(nn.Module):
 
         # --------------------------------------------------------------------------
 
+        # //MODIFIED: NEW PREDICTION HEAD!
+        self.pred_head = nn.ModuleList()
+        self.pred_head.append(nn.Linear(embed_dim, 1))
+        self.pred_head.append(nn.GELU())
+        self.pred_head = nn.Sequential(*self.pred_head)
+        
         # prediction head
-        self.head = nn.ModuleList()
+        # image_head is the old prediction head, keeping for combinined pretraining task
+        self.image_head = nn.ModuleList()
         for _ in range(decoder_depth):
-            self.head.append(nn.Linear(embed_dim, embed_dim))
-            self.head.append(nn.GELU())
-        self.head.append(nn.Linear(embed_dim, len(self.default_vars) * patch_size**2))
-        self.head = nn.Sequential(*self.head)
+            self.image_head.append(nn.Linear(embed_dim, embed_dim))
+            self.image_head.append(nn.GELU())
+        self.image_head.append(nn.Linear(embed_dim, len(self.default_vars) * patch_size**2))
+        self.image_head = nn.Sequential(*self.image_head)
 
         # --------------------------------------------------------------------------
 
@@ -240,6 +247,7 @@ class ClimaX(nn.Module):
         # add variable embedding
         var_embed = self.get_var_emb(self.var_embed, variables)
         x = x + var_embed.unsqueeze(2)  # B, V, L, D
+        y = y + var_embed.unsqueeze(2)  # Variable embedding target //MODIFIED
 
         # variable aggregation// MODIFIED: added target as input
         x = self.aggregate_variables(x, y)  # B, L, D
@@ -275,18 +283,27 @@ class ClimaX(nn.Module):
         """
         out_transformers = self.forward_encoder(x, y, lead_times, variables)  # B, L, D
         # //MODIFY: After modification preds will be a scalar value predicting the lead time
-        preds = self.head(out_transformers)  # B, L, V*p*p
-        # //MODIFY: so no need for this unpatchify stuff
-        preds = self.unpatchify(preds)
-        out_var_ids = self.get_var_ids(tuple(out_variables), preds.device)
-        preds = preds[:, out_var_ids]
-        
-        # //NEED TO MODIFY: m (a metric) needs to take in lead_times instead of y, and the correct lead time at that.
-        if metric is None:
-            loss = None
-        else:
-            loss = [m(preds, y, out_variables, lat) for m in metric]
+        preds = self.pred_head(out_transformers)  
 
+        
+        # //MODIFIED: DON'T DELETE, LEAVE COMMENTED OUT!
+        # WILL NEED TO USE FOR COMBINED TASK!
+        # preds = self.image_pred(out_transformers)  # B, L, V*p*p
+        # preds = self.unpatchify(preds)
+        # out_var_ids = self.get_var_ids(tuple(out_variables), preds.device)
+        # preds = preds[:, out_var_ids]
+
+        # //MODIFIED: Simple MSE Loss between output and lead time
+        mse_loss = nn.MSELoss()
+        pred_loss = mse_loss(preds, lead_times)
+        loss = pred_loss
+        
+        # //NEED TO MODIFY: This part for the original loss, can be used for combined loss
+        # if metric is None:
+        #     loss = None
+        # else:
+        #     loss = [m(preds, y, out_variables, lat) for m in metric]
+        
         return loss, preds
 
     # //NEED TO MODIFY: m (a metric) needs to take in lead_times instead of y, and the correct lead time at that.
