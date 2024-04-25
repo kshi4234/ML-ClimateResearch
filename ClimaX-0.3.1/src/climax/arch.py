@@ -247,13 +247,13 @@ class ClimaX(nn.Module):
         # add variable embedding
         var_embed = self.get_var_emb(self.var_embed, variables)
         x = x + var_embed.unsqueeze(2)  # B, V, L, D
-        y = y + var_embed.unsqueeze(2)  # Variable embedding target //MODIFIED
+        target = target + var_embed.unsqueeze(2)  # Variable embedding target //MODIFIED
 
         # variable aggregation// MODIFIED: added target as input
-        x = self.aggregate_variables(x, y)  # B, L, D
+        x = self.aggregate_variables(x, target)  # B, L, D
 
         # add pos embedding// NEEDS TO BE REMOVED
-        # x = x + self.pos_embed
+        x = x + self.pos_embed
 
         # add lead time embedding// NEEDS TO BE REMOVED
         # lead_time_emb = self.lead_time_embed(lead_times.unsqueeze(-1))  # B, D
@@ -308,5 +308,6 @@ class ClimaX(nn.Module):
 
     # //NEED TO MODIFY: m (a metric) needs to take in lead_times instead of y, and the correct lead time at that.
     def evaluate(self, x, y, lead_times, variables, out_variables, transform, metrics, lat, clim, log_postfix):
-        _, preds = self.forward(x, y, lead_times, variables, out_variables, metric=None, lat=lat)
-        return [m(preds, y, transform, out_variables, lat, clim, log_postfix) for m in metrics]
+        loss, preds = self.forward(x, y, lead_times, variables, out_variables, metric=None, lat=lat)
+        return loss    # //MODIFIED: return mse_loss
+        # return [m(preds, y, transform, out_variables, lat, clim, log_postfix) for m in metrics]    # Use for combined loss
