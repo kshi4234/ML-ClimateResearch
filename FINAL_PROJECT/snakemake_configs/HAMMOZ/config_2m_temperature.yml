@@ -1,0 +1,9 @@
+datadir: /scratch/kys2020/climateML/HAMMOZ
+name: 2m_temperature
+cmip_name: tas
+era_name: t2m
+run: r1i1p1f1
+version: v20190628
+res:
+  - 1.40625
+  # - 5.625

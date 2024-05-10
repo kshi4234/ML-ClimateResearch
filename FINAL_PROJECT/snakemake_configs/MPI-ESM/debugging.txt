@@ -1,0 +1,5 @@
+python ../../src/data_preprocessing/regrid.py --input_fns /scratch/kys2020/climateML/TaiESM1/raw/temperature/temperature_186001010600-187001010000_raw.nc --output_dir /scratch/kys2020/climateML/TaiESM1/1.40625deg/temperature --ddeg_out 1.40625 --cmip 1 --rename ta t --file_ending nc.tmp
+
+
+
+python src/data_preprocessing/nc2np_equally_cmip6.py --dataset mpi --path /scratch/kys2020/climateML/MPI-ESM/1.40625deg/ --num_shards 10 --save_dir /scratch/kys2020/climateML/MPI-ESM/1.40625deg_np_10shards

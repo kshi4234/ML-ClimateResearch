@@ -1,0 +1,1 @@
+python /scratch/kys2020/climateML/ClimaX-0.3.1/src/data_preprocessing/nc2np_equally_cmip6.py --dataset mpi --path /scratch/kys2020/climateML/MPI-ESM/1.40625deg --num_shards 10 --save_dir /scratch/kys2020/climateML/MPI-ESM/1.40625deg
