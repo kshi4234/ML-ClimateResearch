@@ -5,5 +5,5 @@ Credit for codebase goes to Tung Nguyen, Johannes Brandstetter, Ashish Kapoor,Ja
 
 Modified by Kevin Shi.
 
-Final submitted code is in the FINAL_PROJECT folder.
+Final submitted code is in the FINAL_PROJECT folder. Write up is the ML_Final_Paper pdf file.
 Log files that can be viewed using tensorboard are provided in the finetuning_results folder.
